@@ -11,7 +11,7 @@ from flask import Flask, jsonify
 import flask
 import os
 import requests
-from models import db, Meme, Vote
+from models import db, Meme, Vote, Comment
 from settings import MYSQL, GROOT_ACCESS_TOKEN, GROOT_SERVICES_URL
 from flask_restful import Resource, Api, reqparse
 from sqlalchemy.sql.expression import func, text
@@ -265,6 +265,22 @@ class MemeVotingResource(Resource):
         logger.info("Logged vote for %s by %s" % (flask.g.netid, meme_id))
         return send_success("Cast vote for %s" % meme_id)
 
+class MemeCommentResource(Resource):
+
+    @require_token_auth
+    def put(self, meme_id, comment):
+        ''' Post a comment on the requested meme '''
+        netid = flask.g.netid
+
+        if not Meme.query.filter_by(id=meme_id).first():
+            return unknown_meme_response(meme_id)
+
+        comment = Comment(netid=netid, meme_id=meme_id, text=comment)
+        db.session.add(comment)
+        db.session.commit()
+        logger.info("Logged comment '%s' for %s by %s" % (comment, flask.g.netid, meme_id))
+        return send_success("Logged comment for %s" % meme_id)
+
 
 class MemeRandomResource(Resource):
     def get(self):
@@ -277,6 +293,7 @@ api.add_resource(MemeResource, '/memes/<int:meme_id>', endpoint='meme')
 api.add_resource(MemeListResource, '/memes', endpoint='memes')
 api.add_resource(MemeApprovalResource, '/memes/<int:meme_id>/approve')
 api.add_resource(MemeVotingResource, '/memes/<int:meme_id>/vote')
+api.add_resource(MemeCommentResource, '/memes/<int:meme_id>/<str:comment>/comment')
 api.add_resource(MemeRandomResource, '/memes/random')
 db.init_app(app)
 db.create_all(app=app)

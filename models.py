@@ -21,6 +21,7 @@ class Meme(db.Model):
     approved = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
     votes = db.relationship('Vote', backref='meme', lazy='dynamic')
+    comments = db.relationship('Comment', backref='comment', lazy='dynamic')
 
     def to_dict(self):
         meme_dict = {
@@ -29,7 +30,8 @@ class Meme(db.Model):
             'created_at': self.created_at.isoformat(),
             'title': self.title,
             'author': self.netid,
-            'votes': self.votes.count()
+            'votes': self.votes.count(),
+            'comments': self.comments.count()
         }
         if not self.approved:
             meme_dict['unapproved'] = True
@@ -39,5 +41,12 @@ class Meme(db.Model):
 class Vote(db.Model):
     __tablename__ = "votes"
     id = db.Column(db.Integer, primary_key=True)
+    netid = db.Column(db.String(100))
+    meme_id = db.Column(db.Integer, db.ForeignKey('memes.id'))
+
+class Comment(db.Model):
+    __tablename__ = "comments"
+    id = db.Column(db.Integer, primary_key=True)
     netid = db.Column(db.String(100), index=True)
+    text = db.Column(db.String(200))
     meme_id = db.Column(db.Integer, db.ForeignKey('memes.id'))
