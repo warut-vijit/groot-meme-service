@@ -268,19 +268,41 @@ class MemeVotingResource(Resource):
 class MemeCommentResource(Resource):
 
     @require_token_auth
-    def put(self, meme_id, comment):
+    def put(self, meme_id):
         ''' Post a comment on the requested meme '''
         netid = flask.g.netid
 
         if not Meme.query.filter_by(id=meme_id).first():
             return unknown_meme_response(meme_id)
 
-        comment = Comment(netid=netid, meme_id=meme_id, text=comment)
+        parser = reqparse.RequestParser()
+        parser.add_argument('comment', location='args')
+        args = parser.parse_args()
+        comment = Comment(netid=netid, meme_id=meme_id, text=args.comment)
         db.session.add(comment)
         db.session.commit()
         logger.info("Logged comment '%s' for %s by %s" % (comment, flask.g.netid, meme_id))
         return send_success("Logged comment for %s" % meme_id)
+    
+    @require_token_auth
+    def delete(self, meme_id):
+        ''' Delete a comment on the specified meme '''
+        netid = flask.g.netid
 
+        if not Meme.query.filter_by(id=meme_id).first():
+            return unknown_meme_response(meme_id)
+
+        parser = reqparse.RequestParser()
+        parser.add_argument('comment_id', location='args')
+        args = parser.parse_args()
+        comment = Comment.query.filter_by(id=args.comment_id, meme_id=meme_id).first()
+        if comment and (comment.netid==netid or approve_meme_admin(netid)):
+            db.session.delete(comment)
+            db.session.commit()
+            logger.info("%s deleted comment %s on meme %s" % (netid, args.comment_id, meme_id))
+            return "Deleted comment %s. " % args.comment_id
+        else:
+            return send_error("No comment with id %s" % args.comment_id)
 
 class MemeRandomResource(Resource):
     def get(self):
@@ -293,7 +315,7 @@ api.add_resource(MemeResource, '/memes/<int:meme_id>', endpoint='meme')
 api.add_resource(MemeListResource, '/memes', endpoint='memes')
 api.add_resource(MemeApprovalResource, '/memes/<int:meme_id>/approve')
 api.add_resource(MemeVotingResource, '/memes/<int:meme_id>/vote')
-api.add_resource(MemeCommentResource, '/memes/<int:meme_id>/<str:comment>/comment')
+api.add_resource(MemeCommentResource, '/memes/<int:meme_id>/comment')
 api.add_resource(MemeRandomResource, '/memes/random')
 db.init_app(app)
 db.create_all(app=app)
